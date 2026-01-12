@@ -47,7 +47,7 @@ export interface ClientEventMap {
         round: number;
         duration: number;
         data: {
-            text: string;
+            prompt: string;
             l_index: number;
             r_index: number;
         }
@@ -75,16 +75,24 @@ export interface ClientEventMap {
         answerCount: number;
         totalPlayers: number;
     };
+    'client:state': {
+        phase: Phase;
+        round: number;
+        playerCount: number;
+    };
     "client:cancel": {
         reason: string;
     }
     "client:transition": {
         phase: Phase,
         round: number;
-        endsAt?: number;
+        timeleft: number;
     }
     "client:game_over": {
         /* ... */
+    }
+    "client:remaining_time": {
+        timeleft: number;
     }
     // local events
     "local:connected": Record<string, never>;

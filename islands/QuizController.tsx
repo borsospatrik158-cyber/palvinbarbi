@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from "preact/hooks";
-import { signal } from "@preact/signals";
+import { computed } from "@preact/signals";
 import { State } from "../hooks/QuizController.class.ts";
 import { useQuizController } from "../hooks/useQuizController.ts";
+import Layout from "../components/quiz/Layout.tsx";
 import InitializingView from "../components/quiz/InitializingView.tsx";
 import LobbyView from "../components/quiz/LobbyView.tsx";
 import CountdownView from "../components/quiz/CountdownView.tsx";
@@ -20,79 +20,66 @@ interface ControllerProps {
 
 export default function Controller({ roomId, playerId, username }: ControllerProps) {
     const controller = useQuizController(roomId, playerId, username);
-    // Compute options from prompt (only recalculates when prompt changes)
-    const leftOption = useMemo(() => {
-        if (!controller?.prompt.value) return signal("");
-        const { text, l_index } = controller.prompt.value;
-        return signal(text.slice(0, l_index).trim());
-    }, [controller?.prompt.value]);
 
-    const rightOption = useMemo(() => {
-        if (!controller?.prompt.value) return signal("");
-        const { text, r_index } = controller.prompt.value;
-        return signal(text.slice(r_index).trim());
-    }, [controller?.prompt.value]);
+    // Use computed signals - these automatically track controller.prompt and update
+    const leftOption = computed(() => {
+        if (!controller?.prompt.value) return "";
+        const { prompt, l_index, r_index } = controller.prompt.value;
+        return prompt.slice(l_index, r_index - 4).trim();
+    });
 
-    useEffect(() => {
-        console.log(controller?.state.value)
-    }, [controller?.state.value]);
+    const rightOption = computed(() => {
+        if (!controller?.prompt.value) return "";
+        const { prompt, r_index } = controller.prompt.value;
+        return prompt.slice(r_index).trim();
+    });
 
-    // Handle null controller (loading state)
+    // Loading state - no controller yet
     if (!controller) {
         return <InitializingView />;
     }
 
+    // Render view based on current state
+    const renderView = () => {
+        switch (controller.state.value) {
+            case State.lobby:
+                return <LobbyView controller={controller} />;
+            case State.countdown:
+                return <CountdownView controller={controller} />;
+            case State.intro:
+                return <IntroView controller={controller} />;
+            case State.start:
+                return (
+                    <PlayingView
+                        controller={controller}
+                        leftOption={leftOption}
+                        rightOption={rightOption}
+                    />
+                );
+            case State.end:
+                return <RoundEndView />;
+            case State.reveal:
+                return <RevealView controller={controller} />;
+            case State.outro:
+                return <OutroView controller={controller} />;
+            case State.stats:
+                if (controller.results.value.length > 0) {
+                    return (
+                        <StatsView
+                            controller={controller}
+                            currentPlayerId={playerId}
+                        />
+                    );
+                }
+                return <InitializingView />;
+            default:
+                return <InitializingView />;
+        }
+    };
+
     return (
-        <div class="quiz-container flex flex-col gap-6 p-6 max-w-4xl mx-auto">
-            {/* Header */}
-            <div class="text-center">
-                <h1 class="text-3xl font-bold text-purple-600">Would You Rather?</h1>
-                <div class="flex justify-center gap-4 mt-2 text-sm text-gray-600">
-                    <span>Round {controller.round.value}</span>
-                    <span>•</span>
-                    <span>{State[controller.state.value]}</span>
-                </div>
-            </div>
-
-            {/* State Views */}
-            {controller.state.value === State.initializing && <InitializingView />}
-
-            {controller.state.value === State.lobby && (
-                <LobbyView controller={controller} />
-            )}
-
-            {controller.state.value === State.countdown && (
-                <CountdownView controller={controller} />
-            )}
-
-            {controller.state.value === State.intro && (
-                <IntroView controller={controller} />
-            )}
-
-            {controller.state.value === State.start && controller.prompt.value && (
-                <PlayingView
-                    controller={controller}
-                    leftOption={leftOption}
-                    rightOption={rightOption}
-                />
-            )}
-
-            {controller.state.value === State.end && <RoundEndView />}
-
-            {controller.state.value === State.reveal && controller.results.value.length > 0 && (
-                <RevealView controller={controller} />
-            )}
-
-            {controller.state.value === State.outro && (
-                <OutroView controller={controller} />
-            )}
-
-            {controller.state.value === State.stats && controller.results.value.length > 0 && (
-                <StatsView
-                    controller={controller}
-                    currentPlayerId={playerId}
-                />
-            )}
-        </div>
+        <Layout controller={controller}>
+            {renderView()}
+        </Layout>
     );
 }
